@@ -1038,7 +1038,14 @@ async function isNextReleaseHealthy(release, app) {
   });
 
   const releases = JSON.parse(releasesOutput);
-  return releases.pods.filter((pod) => (Number(pod.version) === release && pod.status === "Healthy")).length >= releases.replicas_desired;
+  const healthy = releases.pods.filter((pod) => (Number(pod.version) === release && pod.status === "Healthy")).length;
+  // `gigalixir ps:migrate` runs in whichever pod it is handed. While a pod of
+  // the previous release is still there, Terminating included, that can be the
+  // old one: it answers "Migrations already up", and the new release is left
+  // reading columns that do not exist until the next deploy migrates for it.
+  const others = releases.pods.filter((pod) => Number(pod.version) !== release).length;
+
+  return healthy >= releases.replicas_desired && others === 0;
 }
 
 async function waitForNewRelease(oldRelease, app, attempts) {
